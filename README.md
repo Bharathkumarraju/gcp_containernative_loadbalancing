@@ -77,3 +77,102 @@ gke-bknegdemo1-default-pool-ed58839b-tpx6   Ready    <none>   8m42s   v1.20.12-g
 MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$
 ```
 
+### kubectl get clutser-info
+
+```
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$ kubectl cluster-info
+Kubernetes control plane is running at https://35.247.139.96
+GLBCDefaultBackend is running at https://35.247.139.96/api/v1/namespaces/kube-system/services/default-http-backend:http/proxy
+KubeDNS is running at https://35.247.139.96/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+KubeDNSUpstream is running at https://35.247.139.96/api/v1/namespaces/kube-system/services/kube-dns-upstream:dns/proxy
+Metrics-server is running at https://35.247.139.96/api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$ kubectl config current-context
+gke_bharathpoc_asia-southeast1-a_bknegdemo1
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$ kubectl get namespaces
+NAME              STATUS   AGE
+default           Active   28m
+kube-node-lease   Active   28m
+kube-public       Active   28m
+kube-system       Active   28m
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$ kubectl get cs
+Warning: v1 ComponentStatus is deprecated in v1.19+
+NAME                 STATUS    MESSAGE             ERROR
+etcd-0               Healthy   {"health":"true"}
+scheduler            Healthy   ok
+etcd-1               Healthy   {"health":"true"}
+controller-manager   Healthy   ok
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$
+```
+### Run k8s manifest file - Deploy the application in GKE cluster and expose using ingress with NEGs
+
+```
+MacBook-Pro:gcp_containernative_loadbalancing bharathdasaraju$ cd k8s_manifests/
+MacBook-Pro:k8s_manifests bharathdasaraju$ clear
+MacBook-Pro:k8s_manifests bharathdasaraju$ ls -rtlh
+total 8
+-rw-r--r--  1 bharathdasaraju  staff   844B Mar  5 11:49 gke_ingress_neg.yaml
+MacBook-Pro:k8s_manifests bharathdasaraju$ kubectl apply -f gke_ingress_neg.yaml
+deployment.apps/bharath-app created
+service/bharath-service created
+Warning: extensions/v1beta1 Ingress is deprecated in v1.14+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+ingress.extensions/bharath-ingress created
+MacBook-Pro:k8s_manifests bharathdasaraju$
+```
+
+### Wait for 2 to 3mins GCP will launch HTTP(S) load balancer with backend as Network Endpoint GRroup
+
+```
+MacBook-Pro:k8s_manifests bharathdasaraju$ for i in `seq 20`; do curl 34.111.93.157:80 ; echo " "; done
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-5k9sq
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-5k9sq
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+bharath-app-7dcf949f49-5k9sq
+bharath-app-7dcf949f49-5k9sq
+bharath-app-7dcf949f49-nm9g8
+bharath-app-7dcf949f49-j6756
+MacBook-Pro:k8s_manifests bharathdasaraju$
+```
+
+### Now scale the deployment
+
+```
+MacBook-Pro:k8s_manifests bharathdasaraju$ kubectl scale deployment bharath-app --replicas 9
+deployment.apps/bharath-app scaled
+MacBook-Pro:k8s_manifests bharathdasaraju$
+MacBook-Pro:k8s_manifests bharathdasaraju$ kubectl get deploy bharath-app -o wide
+NAME          READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                           SELECTOR
+bharath-app   9/9     9            3           72m   hostname     k8s.gcr.io/serve_hostname:v1.4   run=bharath-app
+MacBook-Pro:k8s_manifests bharathdasaraju$ for i in `seq 1 200`; do curl --connect-timeout 1 -s 34.111.93.157 && echo; done | sort | uniq -c
+  17 bharath-app-7dcf949f49-5k9sq
+  22 bharath-app-7dcf949f49-8ct2d
+  23 bharath-app-7dcf949f49-cdddg
+  22 bharath-app-7dcf949f49-fj5dd
+  24 bharath-app-7dcf949f49-j6756
+  25 bharath-app-7dcf949f49-k7j5f
+  29 bharath-app-7dcf949f49-ncb42
+  22 bharath-app-7dcf949f49-nm9g8
+  16 bharath-app-7dcf949f49-vp4g2
+MacBook-Pro:k8s_manifests bharathdasaraju$
+```
+
+### get the endpoint health :) 
+
+
+* **Network endpoint Group Health**
+
+![NEG get-health](./images/endpoint_health.png)
